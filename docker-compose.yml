@@ -1,0 +1,173 @@
+# File: task-management-system/docker-compose.yml
+# Docker Compose configuration for the Task Management System
+
+version: '3.8'
+
+services:
+  # API Gateway
+  api-gateway:
+    build: ./api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - TENANT_RESOLVER_SERVICE_URL=http://tenant-resolver:8001
+      - USER_MANAGEMENT_SERVICE_URL=http://user-management:8002
+      - PROJECT_SERVICE_URL=http://project-service:8003
+      - URL_SHORTENER_SERVICE_URL=http://url-shortener:8004
+      - ANALYTICS_SERVICE_URL=http://analytics:8005
+    depends_on:
+      - tenant-resolver
+      - user-management
+      - project-service
+      - url-shortener
+      - analytics
+    networks:
+      - tms-network
+    volumes:
+      - ./api-gateway:/app
+
+  # Tenant Resolver Service
+  tenant-resolver:
+    build: ./tenant-resolver-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@tenant-db:5432/tenant_resolver
+    depends_on:
+      - tenant-db
+      - rabbitmq
+    networks:
+      - tms-network
+    volumes:
+      - ./tenant-resolver-service:/app
+
+  # User Management Service
+  user-management:
+    build: ./user-management-service
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@user-db:5432/user_management
+      - JWT_SECRET=your_jwt_secret_key_here
+    depends_on:
+      - user-db
+      - rabbitmq
+    networks:
+      - tms-network
+    volumes:
+      - ./user-management-service:/app
+
+  # Project Service
+  project-service:
+    build: ./project-service
+    ports:
+      - "8003:8003"
+    environment:
+      - TENANT_RESOLVER_SERVICE_URL=http://tenant-resolver:8001
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - rabbitmq
+    networks:
+      - tms-network
+    volumes:
+      - ./project-service:/app
+
+  # URL Shortener Service
+  url-shortener:
+    build: ./url-shortener-service
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@url-db:5432/url_shortener
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - url-db
+      - rabbitmq
+    networks:
+      - tms-network
+    volumes:
+      - ./url-shortener-service:/app
+
+  # Analytics Service
+  analytics:
+    build: ./analytics-service
+    ports:
+      - "8005:8005"
+    environment:
+      - MONGODB_URL=mongodb://analytics-db:27017/analytics
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      - analytics-db
+      - rabbitmq
+    networks:
+      - tms-network
+    volumes:
+      - ./analytics-service:/app
+
+  # Databases
+  tenant-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=tenant_resolver
+    ports:
+      - "5432:5432"
+    networks:
+      - tms-network
+    volumes:
+      - tenant-db-data:/var/lib/postgresql/data
+
+  user-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=user_management
+    ports:
+      - "5433:5432"
+    networks:
+      - tms-network
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+
+  url-db:
+    image: postgres:13
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=url_shortener
+    ports:
+      - "5434:5432"
+    networks:
+      - tms-network
+    volumes:
+      - url-db-data:/var/lib/postgresql/data
+
+  analytics-db:
+    image: mongo:4.4
+    ports:
+      - "27017:27017"
+    networks:
+      - tms-network
+    volumes:
+      - analytics-db-data:/data/db
+
+  # Message Broker
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - tms-network
+
+networks:
+  tms-network:
+    driver: bridge
+
+volumes:
+  tenant-db-data:
+  user-db-data:
+  url-db-data:
+  analytics-db-data:
