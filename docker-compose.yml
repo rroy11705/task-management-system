@@ -36,6 +36,8 @@ services:
       - POSTGRES_ADMIN_PASSWORD=postgres
       - POSTGRES_HOST=tenant-db
       - POSTGRES_PORT=5432
+      - DB_HOST=tenant-db
+      - DB_PORT=5432
     depends_on:
       - tenant-db
       - rabbitmq
