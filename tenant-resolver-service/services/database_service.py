@@ -16,7 +16,7 @@ def get_admin_connection():
     admin_user = os.getenv("POSTGRES_ADMIN_USER", "postgres")
     admin_password = os.getenv("POSTGRES_ADMIN_PASSWORD", "postgres")
     host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
+    port = os.getenv("POSTGRES_PORT", "5434")
     
     conn = psycopg2.connect(
         dbname="postgres",

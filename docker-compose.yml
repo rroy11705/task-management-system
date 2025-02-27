@@ -32,7 +32,12 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@tenant-db:5432/tenant_resolver
+      - DATABASE_URL=postgresql://postgres:postgres@tenant-db:5434/tenant_resolver
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - POSTGRES_ADMIN_USER=postgres
+      - POSTGRES_ADMIN_PASSWORD=postgres
+      - POSTGRES_HOST=tenant-db
+      - POSTGRES_PORT=5434
     depends_on:
       - tenant-db
       - rabbitmq
@@ -112,7 +117,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=tenant_resolver
     ports:
-      - "5432:5432"
+      - "5434:5432"
     networks:
       - tms-network
     volumes:
@@ -125,7 +130,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=user_management
     ports:
-      - "5433:5432"
+      - "5435:5432"
     networks:
       - tms-network
     volumes:
@@ -138,7 +143,7 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=url_shortener
     ports:
-      - "5434:5432"
+      - "5436:5432"
     networks:
       - tms-network
     volumes:

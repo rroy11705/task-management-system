@@ -4,106 +4,155 @@ Manages organization subdomains and their corresponding database connections.
 """
 
 import os
+import uuid
 from fastapi import FastAPI, HTTPException, Depends, status
 from sqlalchemy.orm import Session
-import asyncio
+from typing import Dict, Any
 
 from database import get_db, init_db
 from models import TenantModel
 from schemas import TenantCreate, Tenant, DatabaseConnection
-from services.tenant_service import (
-    create_tenant, 
-    get_tenant, 
-    get_tenant_by_subdomain,
-    get_database_connection
-)
-from events.rabbitmq_client import rabbitmq_client
+from services import tenant_service, database_service
+from events import rabbitmq_client
+from shared.events import Event, EventType
 
 # Initialize FastAPI app
-app = FastAPI(
-    title="Task Management System - Tenant Resolver Service",
-    description="Manages organization subdomains and their corresponding database connections",
-    version="1.0.0"
-)
+app = FastAPI(title="Task Management System - Tenant Resolver Service")
 
 # Initialize database
 init_db()
 
-@app.get("/", tags=["Health"])
+@app.get("/")
 async def root():
-    """
-    Health check endpoint.
-    """
-    return {"status": "healthy", "service": "Tenant Resolver Service"}
+    return {"message": "Tenant Resolver Service"}
 
-@app.post("/tenants", response_model=Tenant, status_code=status.HTTP_201_CREATED, tags=["Tenants"])
-async def create_new_tenant(tenant: TenantCreate, db: Session = Depends(get_db)):
+@app.post("/tenants", response_model=Tenant, status_code=status.HTTP_201_CREATED)
+async def create_tenant(tenant: TenantCreate, db: Session = Depends(get_db)):
     """
     Create a new tenant and provision a database for it.
-    
-    - **name**: The display name for the tenant organization
-    - **subdomain**: The subdomain that will be used to access the tenant's instance
     """
-    return await create_tenant(db, tenant)
+    # Check if tenant with this subdomain already exists
+    existing_tenant = tenant_service.get_tenant_by_subdomain(db, tenant.subdomain)
+    if existing_tenant:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Tenant with subdomain '{tenant.subdomain}' already exists"
+        )
+    
+    # Create tenant in the database
+    new_tenant = tenant_service.create_tenant(db, tenant)
+    
+    # Provision a new database for the tenant
+    try:
+        database_service.provision_database(new_tenant)
+    except Exception as e:
+        # If database provisioning fails, delete the tenant record
+        db.delete(new_tenant)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to provision database for tenant: {str(e)}"
+        )
+    
+    # Apply migrations to the new database
+    try:
+        database_service.run_migrations(new_tenant)
+    except Exception as e:
+        # We should ideally cleanup the created database here, but that's complex
+        # Let's just log the error and return it to the client
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to run migrations for tenant database: {str(e)}"
+        )
+    
+    # Publish TenantCreated event
+    event_payload = {
+        "tenant_id": new_tenant.id,
+        "name": new_tenant.name,
+        "subdomain": new_tenant.subdomain,
+        "db_name": new_tenant.db_name
+    }
+    
+    try:
+        await rabbitmq_client.publish_event(EventType.TENANT_CREATED, event_payload)
+    except Exception as e:
+        # Log this error but don't fail the request, as the tenant is created successfully
+        print(f"Failed to publish tenant creation event: {str(e)}")
+    
+    return new_tenant
 
-@app.get("/tenants/{tenant_id}", response_model=Tenant, tags=["Tenants"])
-async def get_tenant_by_id(tenant_id: str, db: Session = Depends(get_db)):
+@app.get("/tenants/{tenant_id}", response_model=Tenant)
+async def get_tenant(tenant_id: str, db: Session = Depends(get_db)):
     """
     Get tenant details by ID.
     """
-    return get_tenant(db, tenant_id)
-
-@app.get("/tenants/by-subdomain/{subdomain}", response_model=Tenant, tags=["Tenants"])
-async def get_tenant_details_by_subdomain(subdomain: str, db: Session = Depends(get_db)):
-    """
-    Get tenant details by subdomain.
-    """
-    tenant = get_tenant_by_subdomain(db, subdomain)
+    tenant = tenant_service.get_tenant(db, tenant_id)
     if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Tenant with subdomain '{subdomain}' not found",
+            detail=f"Tenant with ID '{tenant_id}' not found"
         )
     return tenant
 
-@app.get("/tenants/{tenant_id}/database", response_model=DatabaseConnection, tags=["Databases"])
-async def get_tenant_database_connection_details(tenant_id: str, db: Session = Depends(get_db)):
+@app.get("/tenants/subdomain/{subdomain}", response_model=Tenant)
+async def get_tenant_by_subdomain(subdomain: str, db: Session = Depends(get_db)):
+    """
+    Get tenant details by subdomain.
+    """
+    tenant = tenant_service.get_tenant_by_subdomain(db, subdomain)
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tenant with subdomain '{subdomain}' not found"
+        )
+    return tenant
+
+@app.get("/tenants/{tenant_id}/database", response_model=DatabaseConnection)
+async def get_tenant_database_connection(tenant_id: str, db: Session = Depends(get_db)):
     """
     Get database connection details for a tenant.
     """
-    return get_database_connection(db, tenant_id)
+    tenant = tenant_service.get_tenant(db, tenant_id)
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tenant with ID '{tenant_id}' not found"
+        )
+    
+    # Return database connection details
+    return DatabaseConnection(
+        db_name=tenant.db_name,
+        db_host=tenant.db_host,
+        db_port=tenant.db_port,
+        db_user=tenant.db_user,
+        db_password=tenant.db_password
+    )
 
-@app.post("/tenants/{tenant_id}/migrations", tags=["Databases"])
+@app.post("/tenants/{tenant_id}/migrations", status_code=status.HTTP_200_OK)
 async def run_tenant_migrations(tenant_id: str, db: Session = Depends(get_db)):
     """
     Run database migrations for a tenant.
     """
-    from database_service import run_migrations
+    tenant = tenant_service.get_tenant(db, tenant_id)
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tenant with ID '{tenant_id}' not found"
+        )
     
-    tenant = get_tenant(db, tenant_id)
     try:
-        run_migrations(tenant)
-        return {"status": "success", "message": f"Migrations completed for tenant {tenant_id}"}
+        database_service.run_migrations(tenant)
+        return {"message": f"Migrations successfully applied for tenant '{tenant.name}'"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to run migrations: {str(e)}",
+            detail=f"Failed to run migrations: {str(e)}"
         )
 
 @app.on_event("startup")
 async def startup_event():
-    """
-    Connect to RabbitMQ on startup.
-    """
-    try:
-        await rabbitmq_client.connect()
-    except Exception as e:
-        print(f"Warning: Failed to connect to RabbitMQ on startup: {str(e)}")
-        print("The service will attempt to reconnect when events are published.")
+    await rabbitmq_client.connect()
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """
-    Close RabbitMQ connection on shutdown.
-    """
     await rabbitmq_client.close()

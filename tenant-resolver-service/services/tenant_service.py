@@ -30,7 +30,7 @@ async def create_tenant(db: Session, tenant: TenantCreate):
     # Generate database credentials
     db_name = f"tenant_{tenant_id.replace('-', '_')}"
     db_host = os.getenv("DB_HOST", "localhost")
-    db_port = os.getenv("DB_PORT", "5432")
+    db_port = os.getenv("DB_PORT", "5434")
     db_user = f"tenant_user_{tenant_id.replace('-', '_')}"
     db_password = str(uuid.uuid4())  # In production, use a stronger password generation method
     
