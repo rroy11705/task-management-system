@@ -13,26 +13,29 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import the SQLAlchemy models to enable Alembic to detect model changes
 from database import Base
-from models import TenantModel
+import models  # Import all models so Alembic can detect them
 
 # This is the Alembic Config object, which provides access to the values within the .ini file
 config = context.config
 
 # Interpret the config file for Python logging
-fileConfig(config.config_file_name)
+if config.config_file_name is not None:
+    fileConfig(config.config_file_name)
 
 # Set the target metadata for 'autogenerate' support
 target_metadata = Base.metadata
 
-# Other values from the config, defined by the needs of env.py,
-# can be acquired:
-# ... etc.
-
 def get_url():
-    """Get database URL from environment variable or use default."""
+    """Get database URL from environment variable or fallback to the default."""
+    # Check first for tenant-specific database URL
+    tenant_db_url = os.getenv("TENANT_DB_URL")
+    if tenant_db_url:
+        return tenant_db_url
+    
+    # Otherwise fallback to main resolver service database URL
     return os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@tenant-db:5432/tenant_resolver"
+        "postgresql://postgres:postgres@localhost:5434/tenant_resolver"
     )
 
 def run_migrations_offline():

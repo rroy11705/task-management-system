@@ -6,7 +6,6 @@ import os
 import psycopg2
 import subprocess
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from models import TenantModel
 
 def get_admin_connection():
@@ -72,21 +71,29 @@ def run_migrations(tenant: TenantModel):
     """
     print(f"Running migrations for tenant {tenant.name} (ID: {tenant.id})")
     
-    # In a production environment, you'd use alembic programmatically
-    # But for simplicity, we're using subprocess to run alembic commands
+    # Get current working directory
+    current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     
-    # Get the path to the migrations directory
-    migrations_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "migrations")
+    # Path to the alembic.ini file
+    alembic_ini_path = os.path.join(current_dir, "alembic.ini")
+    
+    if not os.path.exists(alembic_ini_path):
+        raise Exception(f"Alembic configuration file not found at {alembic_ini_path}")
+    
+    # Generate connection string for the tenant database
+    db_url = f"postgresql://{tenant.db_user}:{tenant.db_password}@{tenant.db_host}:{tenant.db_port}/{tenant.db_name}"
     
     # Set environment variables for alembic
     env = os.environ.copy()
-    env["TENANT_DB_URL"] = f"postgresql://{tenant.db_user}:{tenant.db_password}@{tenant.db_host}:{tenant.db_port}/{tenant.db_name}"
+    env["TENANT_DB_URL"] = db_url
+    
+    print(f"env {env}")
     
     try:
-        # Run alembic migrations
+        # Run alembic migrations with explicit config file path
         subprocess.run(
-            ["alembic", "upgrade", "head"], 
-            cwd=migrations_dir,
+            ["alembic", "-c", alembic_ini_path, "upgrade", "head"], 
+            cwd=current_dir,
             env=env,
             check=True
         )

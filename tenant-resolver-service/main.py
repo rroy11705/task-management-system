@@ -41,29 +41,6 @@ async def create_tenant(tenant: TenantCreate, db: Session = Depends(get_db)):
     # Create tenant in the database
     new_tenant = await tenant_service.create_tenant(db, tenant)
     
-    # Provision a new database for the tenant
-    try:
-        database_service.provision_database(new_tenant)
-    except Exception as e:
-        # If database provisioning fails, delete the tenant record
-        db.delete(new_tenant)
-        db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to provision database for tenant: {str(e)}"
-        )
-    
-    # Apply migrations to the new database
-    try:
-        database_service.run_migrations(new_tenant)
-    except Exception as e:
-        # We should ideally cleanup the created database here, but that's complex
-        # Let's just log the error and return it to the client
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to run migrations for tenant database: {str(e)}"
-        )
-    
     # Publish TenantCreated event
     event_payload = {
         "tenant_id": new_tenant.id,
