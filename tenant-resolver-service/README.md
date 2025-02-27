@@ -76,7 +76,7 @@ tenants
 3. **Set up environment variables**
    Create a `.env` file with the following variables:
    ```
-   DATABASE_URL=postgresql://admin:admin@localhost:5434/tenant_resolver
+   DATABASE_URL=postgresql://admin:admin@localhost:5432/tenant_resolver
    RABBITMQ_URL=amqp://guest:guest@localhost:5672/
    POSTGRES_ADMIN_USER=postgres
    POSTGRES_ADMIN_PASSWORD=postgres

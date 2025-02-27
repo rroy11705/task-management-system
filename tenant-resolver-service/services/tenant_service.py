@@ -9,7 +9,7 @@ from fastapi import HTTPException, status
 
 from models import TenantModel
 from schemas import TenantCreate, DatabaseConnection
-from database_service import provision_database, run_migrations
+from services.database_service import provision_database, run_migrations
 from events.rabbitmq_client import rabbitmq_client
 
 async def create_tenant(db: Session, tenant: TenantCreate):

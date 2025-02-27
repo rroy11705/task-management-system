@@ -3,8 +3,6 @@ Tenant Resolver Service for the Task Management System.
 Manages organization subdomains and their corresponding database connections.
 """
 
-import os
-import uuid
 from fastapi import FastAPI, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 from typing import Dict, Any
@@ -13,11 +11,12 @@ from database import get_db, init_db
 from models import TenantModel
 from schemas import TenantCreate, Tenant, DatabaseConnection
 from services import tenant_service, database_service
-from events import rabbitmq_client
+from events.rabbitmq_client import RabbitMQClient
 from shared.events import Event, EventType
 
 # Initialize FastAPI app
 app = FastAPI(title="Task Management System - Tenant Resolver Service")
+rabbitmq_client = RabbitMQClient()
 
 # Initialize database
 init_db()

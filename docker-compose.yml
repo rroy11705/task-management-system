@@ -1,8 +1,6 @@
 # File: task-management-system/docker-compose.yml
 # Docker Compose configuration for the Task Management System
 
-version: '3.8'
-
 services:
   # API Gateway
   api-gateway:
@@ -32,12 +30,12 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@tenant-db:5434/tenant_resolver
+      - DATABASE_URL=postgresql://postgres:postgres@tenant-db:5432/tenant_resolver
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
       - POSTGRES_ADMIN_USER=postgres
       - POSTGRES_ADMIN_PASSWORD=postgres
       - POSTGRES_HOST=tenant-db
-      - POSTGRES_PORT=5434
+      - POSTGRES_PORT=5432
     depends_on:
       - tenant-db
       - rabbitmq
@@ -45,6 +43,7 @@ services:
       - tms-network
     volumes:
       - ./tenant-resolver-service:/app
+      - ./shared:/app/shared
 
   # User Management Service
   user-management:

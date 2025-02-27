@@ -32,7 +32,7 @@ def get_url():
     """Get database URL from environment variable or use default."""
     return os.getenv(
         "DATABASE_URL",
-        "postgresql://postgres:postgres@localhost:5434/tenant_resolver"
+        "postgresql://postgres:postgres@tenant-db:5432/tenant_resolver"
     )
 
 def run_migrations_offline():
