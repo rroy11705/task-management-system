@@ -39,7 +39,7 @@ async def create_tenant(tenant: TenantCreate, db: Session = Depends(get_db)):
         )
     
     # Create tenant in the database
-    new_tenant = tenant_service.create_tenant(db, tenant)
+    new_tenant = await tenant_service.create_tenant(db, tenant)
     
     # Provision a new database for the tenant
     try:
