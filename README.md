@@ -71,4 +71,4 @@ Guidelines for contributing to the project will be added here.
 
 ## License
 
-This project is licensed under [LICENSE] - see the LICENSE file for details.
+This project is licensed under [MIT LICENSE] - see the LICENSE file for details.
