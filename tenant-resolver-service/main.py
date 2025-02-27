@@ -5,18 +5,16 @@ Manages organization subdomains and their corresponding database connections.
 
 from fastapi import FastAPI, HTTPException, Depends, status
 from sqlalchemy.orm import Session
-from typing import Dict, Any
 
 from database import get_db, init_db
 from models import TenantModel
 from schemas import TenantCreate, Tenant, DatabaseConnection
 from services import tenant_service, database_service
-from events.rabbitmq_client import RabbitMQClient
-from shared.events import Event, EventType
+from events.rabbitmq_client import rabbitmq_client
+from shared.events import EventType
 
 # Initialize FastAPI app
 app = FastAPI(title="Task Management System - Tenant Resolver Service")
-rabbitmq_client = RabbitMQClient()
 
 # Initialize database
 init_db()
@@ -127,8 +125,32 @@ async def run_tenant_migrations(tenant_id: str, db: Session = Depends(get_db)):
 
 @app.on_event("startup")
 async def startup_event():
-    await rabbitmq_client.connect()
+    """
+    Application startup event handler with improved error handling.
+    """
+    try:
+        print("Initializing tenant-resolver-service...")
+        # Try to connect to RabbitMQ, but don't fail startup if it doesn't connect
+        try:
+            await rabbitmq_client.connect()
+        except Exception as e:
+            print(f"Warning: Failed to connect to RabbitMQ during startup: {str(e)}")
+            print("The service will attempt to reconnect when needed.")
+            # We'll continue startup even if RabbitMQ is not available
+        
+        print("Tenant-resolver-service initialized successfully.")
+    except Exception as e:
+        print(f"Error during startup: {str(e)}")
+        # Don't re-raise the exception to allow the app to start anyway
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    await rabbitmq_client.close()
+    """
+    Application shutdown event handler.
+    """
+    try:
+        # Only try to close if we previously connected
+        if rabbitmq_client._connected:
+            await rabbitmq_client.close()
+    except Exception as e:
+        print(f"Error during shutdown: {str(e)}")

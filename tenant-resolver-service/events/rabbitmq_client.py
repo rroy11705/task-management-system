@@ -1,16 +1,17 @@
 """
-RabbitMQ client for publishing and consuming events.
+RabbitMQ client for publishing and consuming events with retry logic.
 """
 
 import os
 import json
 import pika
 import asyncio
-from typing import Dict, Any
+import time
+from typing import Dict, Any, Optional
 
 class RabbitMQClient:
     """
-    Client for interacting with RabbitMQ.
+    Client for interacting with RabbitMQ with improved connection retry logic.
     """
     def __init__(self):
         self.url = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost:5672/")
@@ -18,35 +19,46 @@ class RabbitMQClient:
         self.channel = None
         self._connection_lock = asyncio.Lock()
         self._connected = False
+        self.max_retries = 10
+        self.retry_delay = 3  # seconds
 
     async def connect(self):
         """
-        Connect to RabbitMQ and set up channel.
+        Connect to RabbitMQ and set up channel with retry logic.
         """
         async with self._connection_lock:
             if self._connected:
                 return
             
-            try:
-                # Connect to RabbitMQ
-                connection_params = pika.URLParameters(self.url)
-                self.connection = pika.BlockingConnection(connection_params)
-                self.channel = self.connection.channel()
-                
-                # Declare exchange
-                self.channel.exchange_declare(
-                    exchange='tenant_events',
-                    exchange_type='topic',
-                    durable=True
-                )
-                
-                self._connected = True
-                print("Connected to RabbitMQ")
-            except Exception as e:
-                print(f"Failed to connect to RabbitMQ: {str(e)}")
-                self._connected = False
-                # Re-raise to let the caller handle the error
-                raise
+            retries = 0
+            while retries < self.max_retries:
+                try:
+                    print(f"Attempting to connect to RabbitMQ at {self.url} (attempt {retries + 1}/{self.max_retries})")
+                    # Connect to RabbitMQ
+                    connection_params = pika.URLParameters(self.url)
+                    self.connection = pika.BlockingConnection(connection_params)
+                    self.channel = self.connection.channel()
+                    
+                    # Declare exchange
+                    self.channel.exchange_declare(
+                        exchange='tenant_events',
+                        exchange_type='topic',
+                        durable=True
+                    )
+                    
+                    self._connected = True
+                    print("Successfully connected to RabbitMQ")
+                    return
+                except Exception as e:
+                    retries += 1
+                    print(f"Failed to connect to RabbitMQ: {str(e)}")
+                    if retries >= self.max_retries:
+                        print("Maximum retry attempts reached. Could not connect to RabbitMQ.")
+                        raise
+                    
+                    wait_time = self.retry_delay * retries
+                    print(f"Waiting {wait_time} seconds before retrying...")
+                    await asyncio.sleep(wait_time)
 
     async def close(self):
         """
@@ -61,12 +73,18 @@ class RabbitMQClient:
                 except Exception as e:
                     print(f"Error closing RabbitMQ connection: {str(e)}")
 
-    async def publish_event(self, event_type: str, payload: Dict[str, Any]):
+    async def ensure_connection(self):
         """
-        Publish an event to RabbitMQ.
+        Ensure there is a connection to RabbitMQ before performing operations.
         """
         if not self._connected:
             await self.connect()
+
+    async def publish_event(self, event_type: str, payload: Dict[str, Any]):
+        """
+        Publish an event to RabbitMQ with automatic reconnection.
+        """
+        await self.ensure_connection()
         
         try:
             # Add timestamp to payload
@@ -92,7 +110,7 @@ class RabbitMQClient:
             print(f"Published event {event_type}")
         except Exception as e:
             print(f"Error publishing event: {str(e)}")
-            # Try to reconnect for next time
+            # Mark as disconnected and try to reconnect next time
             self._connected = False
             # Re-raise to let the caller handle the error
             raise

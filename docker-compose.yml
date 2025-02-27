@@ -14,11 +14,16 @@ services:
       - URL_SHORTENER_SERVICE_URL=http://url-shortener:8004
       - ANALYTICS_SERVICE_URL=http://analytics:8005
     depends_on:
-      - tenant-resolver
-      - user-management
-      - project-service
-      - url-shortener
-      - analytics
+      tenant-resolver:
+        condition: service_started
+      user-management:
+        condition: service_started
+      project-service:
+        condition: service_started
+      url-shortener:
+        condition: service_started
+      analytics:
+        condition: service_started
     networks:
       - tms-network
     volumes:
@@ -39,8 +44,11 @@ services:
       - DB_HOST=tenant-db
       - DB_PORT=5432
     depends_on:
-      - tenant-db
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      tenant-db:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - tms-network
     volumes:
@@ -55,9 +63,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@user-db:5432/user_management
       - JWT_SECRET=your_jwt_secret_key_here
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      - user-db
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      user-db:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - tms-network
     volumes:
@@ -72,7 +84,9 @@ services:
       - TENANT_RESOLVER_SERVICE_URL=http://tenant-resolver:8001
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - tms-network
     volumes:
@@ -87,8 +101,11 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@url-db:5432/url_shortener
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      - url-db
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      url-db:
+        condition: service_healthy
+    restart: on-failure
     networks:
       - tms-network
     volumes:
@@ -103,8 +120,11 @@ services:
       - MONGODB_URL=mongodb://analytics-db:27017/analytics
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      - analytics-db
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
+      analytics-db:
+        condition: service_started
+    restart: on-failure
     networks:
       - tms-network
     volumes:
@@ -123,6 +143,11 @@ services:
       - tms-network
     volumes:
       - tenant-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   user-db:
     image: postgres:13
@@ -136,6 +161,11 @@ services:
       - tms-network
     volumes:
       - user-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   url-db:
     image: postgres:13
@@ -149,6 +179,11 @@ services:
       - tms-network
     volumes:
       - url-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   analytics-db:
     image: mongo:4.4
@@ -167,6 +202,12 @@ services:
       - "15672:15672"
     networks:
       - tms-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 networks:
   tms-network:
