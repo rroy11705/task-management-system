@@ -21,7 +21,7 @@ init_db()
 
 @app.get("/")
 async def root():
-    return {"message": "Tenant Resolver Service"}
+    return {"message": "Tenant Resolver Service", "status": "healthy"}
 
 @app.post("/tenants", response_model=Tenant, status_code=status.HTTP_201_CREATED)
 async def create_tenant(tenant: TenantCreate, db: Session = Depends(get_db)):

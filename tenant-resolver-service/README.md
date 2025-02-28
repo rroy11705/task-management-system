@@ -28,7 +28,7 @@ The Tenant Resolver Service is built with:
 | GET | `/` | Health check endpoint |
 | POST | `/tenants` | Create a new tenant and provision its database |
 | GET | `/tenants/{tenant_id}` | Get tenant details by ID |
-| GET | `/tenants/by-subdomain/{subdomain}` | Get tenant details by subdomain |
+| GET | `/tenants/subdomain/{subdomain}` | Get tenant details by subdomain |
 | GET | `/tenants/{tenant_id}/database` | Get database connection details for a tenant |
 | POST | `/tenants/{tenant_id}/migrations` | Run database migrations for a tenant |
 
