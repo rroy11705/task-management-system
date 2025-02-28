@@ -8,8 +8,8 @@ from jose import jwt, JWTError
 import os
 
 # JWT configuration
-JWT_SECRET = os.getenv("JWT_SECRET", "your_secret_key_here")
-ALGORITHM = "HS256"
+JWT_SECRET = os.getenv("JWT_SECRET")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 security = HTTPBearer()
 

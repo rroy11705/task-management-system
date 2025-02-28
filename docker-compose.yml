@@ -8,11 +8,19 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - DEBUG=true
+      - HOST=0.0.0.0
+      - PORT=8000
+      - JWT_SECRET_KEY=84b7e1fb7df7a321e56b8112cace70c3548d801198284c7acf49dc043a8bdf9a4d34bd691eab9a733f3dfda5223575d13e7131c25e6fb942ebd70510bf19907e
+      - JWT_ALGORITHM=HS256
       - TENANT_RESOLVER_SERVICE_URL=http://tenant-resolver:8001
       - USER_MANAGEMENT_SERVICE_URL=http://user-management:8002
       - PROJECT_SERVICE_URL=http://project-service:8003
       - URL_SHORTENER_SERVICE_URL=http://url-shortener:8004
       - ANALYTICS_SERVICE_URL=http://analytics:8005
+      - CORS_ORIGINS=http://localhost,http://localhost:3000
+      - RATE_LIMIT_PER_MINUTE=100
+      - USE_REDIS_RATE_LIMIT=false
     depends_on:
       tenant-resolver:
         condition: service_started
@@ -25,7 +33,7 @@ services:
       analytics:
         condition: service_started
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - ./api-gateway:/app
 
@@ -50,7 +58,7 @@ services:
         condition: service_healthy
     restart: on-failure
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - ./tenant-resolver-service:/app
       - ./shared:/app/shared
@@ -61,8 +69,16 @@ services:
     ports:
       - "8002:8002"
     environment:
+      - DEBUG=true
+      - HOST=0.0.0.0
+      - PORT=8001
       - DATABASE_URL=postgresql://postgres:postgres@user-db:5432/user_management
-      - JWT_SECRET=your_jwt_secret_key_here
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_HOST=user-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=user_management
+      - JWT_SECRET=84b7e1fb7df7a321e56b8112cace70c3548d801198284c7acf49dc043a8bdf9a4d34bd691eab9a733f3dfda5223575d13e7131c25e6fb942ebd70510bf19907e
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
       rabbitmq:
@@ -71,7 +87,7 @@ services:
         condition: service_healthy
     restart: on-failure
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - ./user-management-service:/app
       - ./shared:/app/shared
@@ -89,7 +105,7 @@ services:
         condition: service_healthy
     restart: on-failure
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - ./project-service:/app
 
@@ -108,7 +124,7 @@ services:
         condition: service_healthy
     restart: on-failure
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - ./url-shortener-service:/app
 
@@ -127,7 +143,7 @@ services:
         condition: service_started
     restart: on-failure
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - ./analytics-service:/app
 
@@ -141,7 +157,7 @@ services:
     ports:
       - "5434:5432"
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - tenant-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -159,7 +175,7 @@ services:
     ports:
       - "5435:5432"
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - user-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -177,7 +193,7 @@ services:
     ports:
       - "5436:5432"
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - url-db-data:/var/lib/postgresql/data
     healthcheck:
@@ -191,7 +207,7 @@ services:
     ports:
       - "27017:27017"
     networks:
-      - tms-network
+      - saas-network
     volumes:
       - analytics-db-data:/data/db
 
@@ -202,7 +218,7 @@ services:
       - "5672:5672"
       - "15672:15672"
     networks:
-      - tms-network
+      - saas-network
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
       interval: 10s
@@ -211,7 +227,7 @@ services:
       start_period: 15s
 
 networks:
-  tms-network:
+  saas-network:
     driver: bridge
 
 volumes:
