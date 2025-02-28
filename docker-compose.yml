@@ -74,6 +74,7 @@ services:
       - tms-network
     volumes:
       - ./user-management-service:/app
+      - ./shared:/app/shared
 
   # Project Service
   project-service:

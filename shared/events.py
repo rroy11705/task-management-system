@@ -1,36 +1,27 @@
 """
-Shared event definitions for the Task Management System.
+Event definitions for the User Management Service.
 """
 
 from enum import Enum
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 class EventType(str, Enum):
+    """Event types for the User Management Service."""
     # User events
     USER_CREATED = "user.created"
     USER_UPDATED = "user.updated"
+    USER_DELETED = "user.deleted"
+    USER_DEACTIVATED = "user.deactivated"
+    USER_REACTIVATED = "user.reactivated"
     USER_PERMISSION_CHANGED = "user.permission_changed"
     
-    # Project events
-    PROJECT_CREATED = "project.created"
-    PROJECT_UPDATED = "project.updated"
-    PROJECT_USER_ADDED = "project.user_added"
+    # Tenant events
+    TENANT_CREATED = "tenant.created"
+    TENANT_UPDATED = "tenant.updated"
+    TENANT_DELETED = "tenant.deleted"
     
-    # Task events
-    TASK_CREATED = "task.created"
-    TASK_STATUS_CHANGED = "task.status_changed"
-    TASK_ASSIGNED = "task.assigned"
-    TASK_COMMENT_ADDED = "task.comment_added"
-    
-    # URL events
-    URL_CREATED = "url.created"
-    URL_ACCESSED = "url.accessed"
-    URL_EXPIRED = "url.expired"
-
 class Event:
-    """
-    Base class for all events.
-    """
+    """Base class for all events."""
     def __init__(
         self,
         event_type: EventType,
@@ -44,9 +35,7 @@ class Event:
         self.metadata = metadata or {}
     
     def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert event to dictionary for serialization.
-        """
+        """Convert event to dictionary for serialization."""
         return {
             "event_type": self.event_type,
             "tenant_id": self.tenant_id,
@@ -54,11 +43,8 @@ class Event:
             "metadata": self.metadata
         }
 
-# Example event class implementations
 class UserCreatedEvent(Event):
-    """
-    Event emitted when a user is created.
-    """
+    """Event emitted when a user is created."""
     def __init__(self, tenant_id: str, user_id: str, email: str, username: str):
         super().__init__(EventType.USER_CREATED, tenant_id, user_id)
         self.metadata.update({
@@ -66,29 +52,43 @@ class UserCreatedEvent(Event):
             "username": username
         })
 
-class TaskStatusChangedEvent(Event):
-    """
-    Event emitted when a task status changes.
-    """
-    def __init__(self, tenant_id: str, user_id: str, task_id: str, project_id: str, old_status: str, new_status: str):
-        super().__init__(EventType.TASK_STATUS_CHANGED, tenant_id, user_id)
+class UserUpdatedEvent(Event):
+    """Event emitted when a user is updated."""
+    def __init__(self, tenant_id: str, user_id: str, updated_fields: Dict[str, Any]):
+        super().__init__(EventType.USER_UPDATED, tenant_id, user_id)
         self.metadata.update({
-            "task_id": task_id,
-            "project_id": project_id,
-            "old_status": old_status,
-            "new_status": new_status
+            "updated_fields": updated_fields
         })
 
-class URLAccessedEvent(Event):
-    """
-    Event emitted when a shortened URL is accessed.
-    """
-    def __init__(self, tenant_id: str, url_id: str, short_code: str, user_id: Optional[str] = None, ip_address: Optional[str] = None, user_agent: Optional[str] = None, referrer: Optional[str] = None):
-        super().__init__(EventType.URL_ACCESSED, tenant_id, user_id)
+class UserDeactivatedEvent(Event):
+    """Event emitted when a user is deactivated."""
+    def __init__(self, tenant_id: str, user_id: str, deactivated_by: Optional[str] = None):
+        super().__init__(EventType.USER_DEACTIVATED, tenant_id, user_id)
         self.metadata.update({
-            "url_id": url_id,
-            "short_code": short_code,
-            "ip_address": ip_address,
-            "user_agent": user_agent,
-            "referrer": referrer
+            "deactivated_by": deactivated_by
+        })
+
+class UserReactivatedEvent(Event):
+    """Event emitted when a user is reactivated."""
+    def __init__(self, tenant_id: str, user_id: str, reactivated_by: Optional[str] = None):
+        super().__init__(EventType.USER_REACTIVATED, tenant_id, user_id)
+        self.metadata.update({
+            "reactivated_by": reactivated_by
+        })
+
+class UserPermissionChangedEvent(Event):
+    """Event emitted when a user's permissions change."""
+    def __init__(
+        self, 
+        tenant_id: str, 
+        user_id: str, 
+        role_id: str, 
+        role_name: str,
+        permissions: List[str]
+    ):
+        super().__init__(EventType.USER_PERMISSION_CHANGED, tenant_id, user_id)
+        self.metadata.update({
+            "role_id": role_id,
+            "role_name": role_name,
+            "permissions": permissions
         })
