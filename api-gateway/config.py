@@ -7,8 +7,9 @@ It loads environment variables and provides default values for the service.
 
 import os
 from typing import List
-from pydantic import validator
-from pydantic_settings import BaseSettings
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, NoDecode
+from typing_extensions import Annotated
 
 
 class Settings(BaseSettings):
@@ -21,6 +22,7 @@ class Settings(BaseSettings):
     PORT: int = int(os.getenv("PORT", "8000"))
     
     # JWT configuration
+    print("JWT_SECRET", os.getenv("JWT_SECRET"))
     JWT_SECRET: str = os.getenv("JWT_SECRET")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_EXPIRATION_MINUTES: int = int(os.getenv("JWT_EXPIRATION_MINUTES", "60"))
@@ -34,15 +36,13 @@ class Settings(BaseSettings):
         "TENANT_RESOLVER_SERVICE_URL",
         "http://tenant-resolver-service:8002"
     )
-    
     # CORS configuration
-    CORS_ORIGINS: List[str] = os.getenv(
-        "CORS_ORIGINS",
-        "http://localhost,http://localhost:3000"
-    ).split(",")
-    
-    @validator("CORS_ORIGINS", pre=True)
-    def assemble_cors_origins(cls, v: str) -> List[str]:
+    print("CORS_ORIGINS", os.getenv("CORS_ORIGINS"))
+    CORS_ORIGINS: Annotated[List[str], NoDecode] = os.getenv("CORS_ORIGINS", "http://localhost,http://localhost:3000")
+
+    @field_validator("CORS_ORIGINS", mode='before')
+    @classmethod
+    def decode_cors_origins(cls, v: str) -> List[str]:
         """
         Validates and formats the CORS origins.
         
@@ -52,6 +52,7 @@ class Settings(BaseSettings):
         Returns:
             List of CORS origins
         """
+        print("v", v)
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
         elif isinstance(v, (list, str)):
