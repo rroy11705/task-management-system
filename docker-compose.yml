@@ -108,6 +108,7 @@ services:
       - saas-network
     volumes:
       - ./project-service:/app
+      - ./shared:/app/shared
 
   # URL Shortener Service
   url-shortener:
@@ -161,7 +162,7 @@ services:
     volumes:
       - tenant-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -179,7 +180,7 @@ services:
     volumes:
       - user-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -197,7 +198,7 @@ services:
     volumes:
       - url-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -220,7 +221,7 @@ services:
     networks:
       - saas-network
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      test: [ "CMD", "rabbitmq-diagnostics", "check_port_connectivity" ]
       interval: 10s
       timeout: 5s
       retries: 5
